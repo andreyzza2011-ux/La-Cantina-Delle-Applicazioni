@@ -24,6 +24,7 @@ def keep_alive():
 
 # --- 2. CONFIGURATION ---
 LOGS_CHANNEL_ID = 1488894440797110318 
+BOT_NAME = "LordZen Bot"
 
 DOMANDE = [
     "Nome Utente di Discord",
@@ -59,7 +60,7 @@ class ReasonModal(ui.Modal):
         status_text = "ACCETTATA ✅" if is_approval else "RIFIUTATA ❌"
         
         try:
-            embed_dm = discord.Embed(title=f"Esito Candidatura - {interaction.guild.name}", color=color)
+            embed_dm = discord.Embed(title=f"Esito Candidatura | {BOT_NAME}", color=color)
             embed_dm.description = f"La tua candidatura è stata **{status_text}**."
             embed_dm.add_field(name="Motivazione dello Staff:", value=self.reason_input.value)
             await self.target_user.send(embed=embed_dm)
@@ -78,34 +79,28 @@ class StaffReviewView(ui.View):
         super().__init__(timeout=None)
         self.target_user = target_user
 
-    # BUTTON 1: Accept without reason
     @ui.button(label="Accetta", style=discord.ButtonStyle.success, emoji="✔️")
     async def approve_simple(self, interaction: discord.Interaction, button: ui.Button):
         await self.process_simple(interaction, "ACCETTATA ✅", discord.Color.green())
 
-    # BUTTON 2: Accept with reason (Modal)
     @ui.button(label="Accetta con Motivo", style=discord.ButtonStyle.success, emoji="📝")
     async def approve_reason(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReasonModal("Accetta", self.target_user))
 
-    # BUTTON 3: Deny without reason
     @ui.button(label="Rifiuta", style=discord.ButtonStyle.danger, emoji="✖️")
     async def deny_simple(self, interaction: discord.Interaction, button: ui.Button):
         await self.process_simple(interaction, "RIFIUTATA ❌", discord.Color.red())
 
-    # BUTTON 4: Deny with reason (Modal)
     @ui.button(label="Rifiuta con Motivo", style=discord.ButtonStyle.danger, emoji="🚫")
     async def deny_reason(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.send_modal(ReasonModal("Rifiuta", self.target_user))
 
     async def process_simple(self, interaction, status_text, color):
         try:
-            # Send simple Embed to user
-            embed_dm = discord.Embed(title=f"Esito Candidatura - {interaction.guild.name}", color=color)
+            embed_dm = discord.Embed(title=f"Esito Candidatura | {BOT_NAME}", color=color)
             embed_dm.description = f"La tua candidatura è stata **{status_text}**."
             await self.target_user.send(embed=embed_dm)
             
-            # Update Log
             embed_log = interaction.message.embeds[0]
             embed_log.color = color
             embed_log.add_field(name="Decisione Finale", value=f"{status_text} da {interaction.user.mention}", inline=False)
@@ -119,7 +114,7 @@ class ApplyView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="Candidati Ora", style=discord.ButtonStyle.success, custom_id="apply_button_v14_final")
+    @ui.button(label="Candidati Ora", style=discord.ButtonStyle.success, custom_id="apply_button_v17")
     async def apply_button(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
         try:
@@ -136,10 +131,11 @@ class ApplyView(ui.View):
         
         for i, q in enumerate(DOMANDE, 1):
             dm_embed = discord.Embed(
-                title="Gestore Applicazioni", 
+                title=f"Gestore Applicazioni | {BOT_NAME}", 
                 description=f"**{i}/{total_questions}. {q}**",
                 color=discord.Color.blue()
             )
+            dm_embed.set_footer(text="Rispondi a questo messaggio per proseguire.")
             await user.send(embed=dm_embed)
             
             def check(m): return m.author.id == user.id and isinstance(m.channel, discord.DMChannel)
@@ -147,20 +143,18 @@ class ApplyView(ui.View):
                 msg = await bot.wait_for('message', check=check, timeout=600.0)
                 risposte.append(msg.content)
             except asyncio.TimeoutError:
-                await user.send("⏰ Tempo scaduto! La candidatura è stata rifiutata.")
+                await user.send("⏰ Tempo scaduto! La candidatura è stata chiusa.")
                 return
 
         log_chan = guild.get_channel(LOGS_CHANNEL_ID)
         if log_chan:
-            # Send log to staff
-            embed_staff = discord.Embed(title="Nuova Candidatura Staff", color=discord.Color.blue())
+            embed_staff = discord.Embed(title=f"Nuova Candidatura Staff | {BOT_NAME}", color=discord.Color.blue())
             embed_staff.set_author(name=user.name, icon_url=user.display_avatar.url)
             for q, r in zip(DOMANDE, risposte):
                 embed_staff.add_field(name=q, value=r[:1024], inline=False)
             
             await log_chan.send(embed=embed_staff, view=StaffReviewView(user))
             
-            # FINAL DM MESSAGE AS EMBED
             final_dm = discord.Embed(
                 title="Applicazione Terminata",
                 description="✅ **La tua candidatura è stata inviata correttamente allo staff!**\nTi faremo sapere l'esito il prima possibile.",
@@ -176,6 +170,11 @@ class AppBot(commands.Bot):
         intents.members = True
         super().__init__(command_prefix="!", intents=intents)
 
+    async def on_ready(self):
+        # CUSTOM STATUS ADDED HERE
+        await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Applicazioni staff"))
+        print(f"Logged in as {self.user} - Status Set!")
+
     async def setup_hook(self):
         self.add_view(ApplyView())
         await self.tree.sync()
@@ -185,7 +184,11 @@ bot = AppBot()
 @bot.tree.command(name="setup_apply", description="Invia il pannello candidature")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_apply(interaction: discord.Interaction):
-    embed = discord.Embed(title="💼 Candidature Staff", description="Clicca il pulsante sotto per iniziare. L'applicazione ha un limite di tempo e, se superato, porterà al rifiuto automatico dell'applicazione", color=discord.Color.gold())
+    embed = discord.Embed(
+        title=f"💼 Candidature Staff | {BOT_NAME}", 
+        description="Clicca il pulsante sotto per iniziare. L'applicazione ha un limite di tempo e, se superato, porterà al rifiuto automatico dell'applicazione.", 
+        color=discord.Color.gold()
+    )
     await interaction.channel.send(embed=embed, view=ApplyView())
     await interaction.response.send_message("Pannello inviato!", ephemeral=True)
 
