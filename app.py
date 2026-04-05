@@ -14,7 +14,6 @@ def home():
     return "Bot is online!"
 
 def run_flask():
-    # Render requires dynamic port binding
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
@@ -30,12 +29,12 @@ DOMANDE = [
     "Nome Utente di Discord",
     "Perché vuoi diventare staff? (2-3 frasi)",
     "Quanto tempo potresti dedicare al server ogni giorno?",
-    "Perché dovremmo scegliere proprio te invece di qualcun altro? (2-3 frasi)",
+    "Perché dovremmo scegliere proprio te invece di qualcun altro?",
     "Prometti di non abusare del tuo potere?",
     "Prometti di rispettare gli ordini dei tuoi superiori?",
-    "Se vedi due membri del server litigare, cosa faresti? Che provvedimenti prenderesti?",
+    "Se vedi due membri del server litigare, cosa faresti?",
     "Se uno staffer abusa di potere cosa faresti?",
-    "L'applicazione è finita. Desideri aggiungere qualcos'altro?"
+    "Desideri aggiungere qualcos'altro?"
 ]
 
 # --- 3. MODAL FOR STAFF REASONS ---
@@ -60,13 +59,11 @@ class ReasonModal(ui.Modal):
         status_text = "ACCETTATA ✅" if is_approval else "RIFIUTATA ❌"
         
         try:
-            # Send DM to user
             embed_dm = discord.Embed(title=f"Esito Candidatura - {interaction.guild.name}", color=color)
             embed_dm.description = f"La tua candidatura è stata **{status_text}**."
             embed_dm.add_field(name="Motivazione dello Staff:", value=self.reason_input.value)
             await self.target_user.send(embed=embed_dm)
             
-            # Update Log Channel
             embed_log = interaction.message.embeds[0]
             embed_log.color = color
             embed_log.add_field(name="Decisione Finale", value=f"{status_text} da {interaction.user.mention}\n**Motivo:** {self.reason_input.value}")
@@ -94,16 +91,16 @@ class ApplyView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="Candidati Ora", style=discord.ButtonStyle.success, custom_id="apply_button_v8")
+    @ui.button(label="Candidati Ora", style=discord.ButtonStyle.success, custom_id="apply_button_final_v10")
     async def apply_button(self, interaction: discord.Interaction, button: ui.Button):
+        user = interaction.user
         try:
-            await interaction.user.send("📝 Iniziamo l'applicazione! Rispondi alle seguenti domande qui sotto.")
-            await interaction.response.send_message("Controlla i tuoi DM!", ephemeral=True)
+            await user.send("📝 Iniziamo l'applicazione! Rispondi alle domande qui sotto.")
+            await interaction.response.send_message("Ti ho scritto in privato!", ephemeral=True)
         except discord.Forbidden:
             return await interaction.response.send_message("❌ Errore: Abilita i DM nelle impostazioni del server.", ephemeral=True)
 
-        # Start the background interview
-        asyncio.create_task(self.run_interview(interaction.user, interaction.guild))
+        asyncio.create_task(self.run_interview(user, interaction.guild))
 
     async def run_interview(self, user, guild):
         risposte = []
@@ -114,7 +111,7 @@ class ApplyView(ui.View):
                 msg = await bot.wait_for('message', check=check, timeout=600.0)
                 risposte.append(msg.content)
             except asyncio.TimeoutError:
-                await user.send("⏰ Tempo scaduto! La candidatura è stata annullata perché hai esaurito il tempo a disposizione.")
+                await user.send("⏰ Tempo scaduto! Candidatura rifiutata.")
                 return
 
         log_chan = guild.get_channel(LOGS_CHANNEL_ID)
@@ -130,24 +127,22 @@ class ApplyView(ui.View):
 # --- 6. BOT CLASS ---
 class AppBot(commands.Bot):
     def __init__(self):
+        # FIX: Removed intents.direct_messages to stop the AttributeError crash
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
-        intents.direct_messages = True
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Register ONLY the persistent ApplyView. 
-        # StaffReviewView is created dynamically and shouldn't be here.
         self.add_view(ApplyView())
         await self.tree.sync()
 
 bot = AppBot()
 
-@bot.tree.command(name="setup_apply")
+@bot.tree.command(name="setup_apply", description="Invia il pannello candidature")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_apply(interaction: discord.Interaction):
-    embed = discord.Embed(title="💼 Candidature Staff", description="Clicca il pulsante sotto per iniziare l'applicazione in DM. Si ricorda che l'applicazione sarà automaticamente rifiutata se dura troppo tempo", color=discord.Color.gold())
+    embed = discord.Embed(title="💼 Candidature Staff", description="Clicca il pulsante sotto per iniziare. L'applicazione ha un limite di tempo e se superato, causerà il rifiuto automatico del bot", color=discord.Color.gold())
     await interaction.channel.send(embed=embed, view=ApplyView())
     await interaction.response.send_message("Pannello inviato!", ephemeral=True)
 
