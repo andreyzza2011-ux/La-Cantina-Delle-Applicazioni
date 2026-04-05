@@ -23,7 +23,7 @@ def keep_alive():
     t.start()
 
 # --- 2. CONFIGURATION ---
-LOGS_CHANNEL_ID = 1488604957262217226 
+LOGS_CHANNEL_ID = 1488894440797110318 
 
 DOMANDE = [
     "Nome Utente di Discord",
