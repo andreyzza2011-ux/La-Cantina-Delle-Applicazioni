@@ -29,10 +29,10 @@ DOMANDE = [
     "Nome Utente di Discord",
     "Perché vuoi diventare staff? (2-3 frasi)",
     "Quanto tempo potresti dedicare al server ogni giorno?",
-    "Perché dovremmo scegliere proprio te invece di qualcun altro?",
+    "Perché dovremmo scegliere proprio te invece di qualcun altro? (2-3 frasi)",
     "Prometti di non abusare del tuo potere?",
     "Prometti di rispettare gli ordini dei tuoi superiori?",
-    "Se vedi due membri del server litigare, cosa faresti?",
+    "Se vedi due membri del server litigare, cosa faresti? Che provvedimenti prenderesti?",
     "Se uno staffer abusa di potere cosa faresti?",
     "Desideri aggiungere qualcos'altro?"
 ]
@@ -91,11 +91,11 @@ class ApplyView(ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @ui.button(label="Candidati Ora", style=discord.ButtonStyle.success, custom_id="apply_button_final_v10")
+    @ui.button(label="Candidati Ora", style=discord.ButtonStyle.success, custom_id="apply_button_v12_embed")
     async def apply_button(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
         try:
-            await user.send("📝 Iniziamo l'applicazione! Rispondi alle domande qui sotto.")
+            await user.send("📝 l'applicazione è iniziata! Rispondi alle seguenti domande.")
             await interaction.response.send_message("Ti ho scritto in privato!", ephemeral=True)
         except discord.Forbidden:
             return await interaction.response.send_message("❌ Errore: Abilita i DM nelle impostazioni del server.", ephemeral=True)
@@ -104,14 +104,24 @@ class ApplyView(ui.View):
 
     async def run_interview(self, user, guild):
         risposte = []
-        for q in DOMANDE:
-            await user.send(f"**Domanda:** {q}")
+        total_questions = len(DOMANDE)
+        
+        for i, q in enumerate(DOMANDE, 1):
+            # THE EMBED QUESTION (MATCHING YOUR SCREENSHOT)
+            dm_embed = discord.Embed(
+                title="Gestore Applicazioni", 
+                description=f"**{i}/{total_questions}. {q}**",
+                color=discord.Color.blue()
+            )
+            await user.send(embed=dm_embed)
+            
             def check(m): return m.author.id == user.id and isinstance(m.channel, discord.DMChannel)
             try:
+                # Wait 10 minutes for an answer
                 msg = await bot.wait_for('message', check=check, timeout=600.0)
                 risposte.append(msg.content)
             except asyncio.TimeoutError:
-                await user.send("⏰ Tempo scaduto! Candidatura rifiutata.")
+                await user.send("⏰ Tempo scaduto! La tua candidatura è stata rifiutata.")
                 return
 
         log_chan = guild.get_channel(LOGS_CHANNEL_ID)
@@ -127,7 +137,6 @@ class ApplyView(ui.View):
 # --- 6. BOT CLASS ---
 class AppBot(commands.Bot):
     def __init__(self):
-        # FIX: Removed intents.direct_messages to stop the AttributeError crash
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
@@ -142,7 +151,11 @@ bot = AppBot()
 @bot.tree.command(name="setup_apply", description="Invia il pannello candidature")
 @app_commands.checks.has_permissions(administrator=True)
 async def setup_apply(interaction: discord.Interaction):
-    embed = discord.Embed(title="💼 Candidature Staff", description="Clicca il pulsante sotto per iniziare. L'applicazione ha un limite di tempo e se superato, causerà il rifiuto automatico del bot", color=discord.Color.gold())
+    embed = discord.Embed(
+        title="💼 Candidature Staff", 
+        description="Clicca il pulsante sotto per iniziare l'applicazione in DM. L'applicazione ha un limite di tempo e se superato, causerà il rifiuto automatico dell'applicazione", 
+        color=discord.Color.gold()
+    )
     await interaction.channel.send(embed=embed, view=ApplyView())
     await interaction.response.send_message("Pannello inviato!", ephemeral=True)
 
